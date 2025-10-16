@@ -31,13 +31,17 @@ public class GridManager : MonoBehaviour
 
         TopLeftPivot.position = new Vector3(-4*CellSize + CellSize/2, 4*CellSize - CellSize / 2, 0);
 
+        //Clearing checking array
         ClearCheckingArray();
 
+        //Fill board with random tokens
         FillWithTokens();
 
+        //Swap out matching tokens on the board
         SwapOutMatches();
 
         //Check for ability to make a move
+
     }
 
     //For testing
@@ -60,16 +64,20 @@ public class GridManager : MonoBehaviour
                 if (i - 1>= 0 && i + 1<= 7 && TokenArray[i - 1, j].name == TokenArray[i, j].name && TokenArray[i + 1, j].name == TokenArray[i, j].name)
                 { 
                     RemovingTokenPrefabs(tklist,TokenArray[i,j]);
+
+                    //Picking random token between the three
+                    int ran_token = UnityEngine.Random.Range(-1, 2);
+
+                    //Removing colors surrounding one of the three tokens
                     if (j-1>=0)
                     {
-                        RemovingTokenPrefabs(tklist, TokenArray[i, j - 1]);
+                        RemovingTokenPrefabs(tklist, TokenArray[i + ran_token, j - 1]);
                     }
                     if (j+1<=7)
                     {
-                        RemovingTokenPrefabs(tklist, TokenArray[i, j + 1]);
+                        RemovingTokenPrefabs(tklist, TokenArray[i + ran_token, j + 1]);
                     }
-
-                    int ran_token = UnityEngine.Random.Range(-1, 2);
+                    
                     int ran_replace_token = UnityEngine.Random.Range(0,tklist.Count);
                     Destroy(TokenArray[i + ran_token, j]);
                     TokenArray[i + ran_token, j] = Instantiate(tklist[ran_replace_token], positionBasedOnPivot(i + ran_token, j), Quaternion.identity);
@@ -80,16 +88,20 @@ public class GridManager : MonoBehaviour
                 if (j - 1 >= 0 && j + 1 <= 7 && TokenArray[i, j - 1].name == TokenArray[i, j].name && TokenArray[i, j + 1].name == TokenArray[i, j].name)
                 {
                     RemovingTokenPrefabs(tklist, TokenArray[i, j]);
+
+                    //Picking random token between the three
+                    int ran_token = UnityEngine.Random.Range(-1, 2);
+
+                    //Removing colors surrounding one of the three tokens
                     if (i - 1 >= 0)
                     {
-                        RemovingTokenPrefabs(tklist, TokenArray[i - 1, j]);
+                        RemovingTokenPrefabs(tklist, TokenArray[i - 1, j + ran_token]);
                     }
                     if (i + 1 <= 7)
                     {
-                        RemovingTokenPrefabs(tklist, TokenArray[i + 1, j]);
+                        RemovingTokenPrefabs(tklist, TokenArray[i + 1, j + ran_token]);
                     }
 
-                    int ran_token = UnityEngine.Random.Range(-1, 2);
                     int ran_replace_token = UnityEngine.Random.Range(0, tklist.Count);
                     Destroy(TokenArray[i, j + ran_token]);
                     TokenArray[i, j + ran_token] = Instantiate(tklist[ran_replace_token], positionBasedOnPivot(i , j + ran_token), Quaternion.identity);
@@ -215,13 +227,35 @@ public class GridManager : MonoBehaviour
 
     bool CheckMatchesOnBoard()
     {
+        MatchList.Clear();
         //Column checks
-        for (int i = 0; i < CheckingArray.GetLength(1); i++)
+        for (int col = 0; col < TokenArray.GetLength(1); col++)
         {
+            for (int row = 0; row < TokenArray.GetLength(0); row++)
+            {
+                if (row + 1 <= 6 && row + 2 <= 7 && TokenArray[row, col].name == TokenArray[row + 1, col].name && TokenArray[row + 1, col].name == TokenArray[row + 2, col].name)
+                {
+                    //Adding new matching list
+                    MatchList.Add(new List<GameObject>());
 
+                    //Add all three to the match list
+                    for (int i = 0; i < 3; i++)
+                    {
+                        AddingToMatchList(MatchList.Count - 1,TokenArray[row + i, col]);
+                    }
+
+
+                }
+            }
         }
 
         //Row checks
+
         return false;
+    }
+
+    void AddingToMatchList(int index, GameObject Token)
+    {
+        MatchList[index].Add(Token);
     }
 }
