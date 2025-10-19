@@ -14,6 +14,8 @@ public class GridManager : MonoBehaviour
     //i is the row
     //j is the column
     public GameObject[,] TokenArray;
+
+    //false is default
     public bool[,] CheckingArray;
 
     //Match List
@@ -182,7 +184,7 @@ public class GridManager : MonoBehaviour
         return TokenArray[row,col];
     }
 
-    public bool SwapToken(Vector2Int SelectedCoords, Vector2Int ClosestCoords, bool horiSwap)
+    public void SwapToken(Vector2Int SelectedCoords, Vector2Int ClosestCoords, bool horiSwap)
     {
 
         //FindFirstObjectByType<InputManager>().SetAnimating(true);
@@ -192,20 +194,22 @@ public class GridManager : MonoBehaviour
         if (CheckMatchesOnBoard())
         {
             //Do the destory
+            DestroyTokensInList();
+
+            //Refill board
+
 
             //While loop until no more can be destroyed
-            while (CheckMatchesOnBoard()){
-                
-            }
-            
+            //while (CheckMatchesOnBoard()){
+            //    
+            //}
+
         }
         else
         {
             //Swap them back
             SwapInArray(SelectedCoords, ClosestCoords);
         }
-        
-        return true;
     }
 
     void SwapInArray(Vector2Int SelectedCoords, Vector2Int ClosestCoords)
@@ -227,35 +231,109 @@ public class GridManager : MonoBehaviour
 
     bool CheckMatchesOnBoard()
     {
-        MatchList.Clear();
+        bool matchfound = false;
         //Column checks
         for (int col = 0; col < TokenArray.GetLength(1); col++)
         {
             for (int row = 0; row < TokenArray.GetLength(0); row++)
             {
-                if (row + 1 <= 6 && row + 2 <= 7 && TokenArray[row, col].name == TokenArray[row + 1, col].name && TokenArray[row + 1, col].name == TokenArray[row + 2, col].name)
+                if (row + 1 <= 6 && row + 2 <= 7 && CheckingArray[row, col]==false && CheckingArray[row + 1, col] == false && CheckingArray[row + 2, col] == false && TokenArray[row, col].name == TokenArray[row + 1, col].name && TokenArray[row + 1, col].name == TokenArray[row + 2, col].name)
                 {
+                    matchfound = true;
                     //Adding new matching list
                     MatchList.Add(new List<GameObject>());
 
                     //Add all three to the match list
-                    for (int i = 0; i < 3; i++)
+                    for (int i = row; i <= 7; i++)
                     {
-                        AddingToMatchList(MatchList.Count - 1,TokenArray[row + i, col]);
+                        if (TokenArray[row, col].name == TokenArray[i, col].name)
+                        {
+                           AddingToMatchList(MatchList.Count - 1, i, col);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                        //
+                        row = i;
                     }
-
+                    
 
                 }
             }
         }
 
         //Row checks
+        for (int row = 0; row < TokenArray.GetLength(0); row++)
+        {
+            for (int col = 0; col < TokenArray.GetLength(1); col++)
+            {
+                if (col + 1 <= 6 && col + 2 <= 7 && CheckingArray[row, col] == false && CheckingArray[row, col + 1] == false && CheckingArray[row, col + 2] == false && TokenArray[row, col].name == TokenArray[row, col + 1].name && TokenArray[row, col + 1].name == TokenArray[row, col + 2].name)
+                {
+                    matchfound = true;
 
-        return false;
+                    //Adding new matching list
+                    MatchList.Add(new List<GameObject>());
+
+                    //Add all three to the match list
+                    for (int i = col; i <= 7; i++)
+                    {
+                        if (TokenArray[row, col].name == TokenArray[row, i].name)
+                        {
+                            AddingToMatchList(MatchList.Count - 1, row, i);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                        //
+                        col = i;
+                    }
+                }
+            }
+        }
+        return matchfound;
     }
 
-    void AddingToMatchList(int index, GameObject Token)
+    void AddingToMatchList(int index, int row, int col)
     {
-        MatchList[index].Add(Token);
+        MatchList[index].Add(TokenArray[row,col]);
+        //Set CheckArray to true so no repeating
+        CheckingArray[row, col] = true;
+        Debug.Log(row +" "+ col);
+    }
+    
+    void DestroyTokensInList()
+    {
+        //Point system here
+        //+i*50 for extra tokens
+        foreach (List<GameObject> tokenmatch in MatchList)
+        {
+            foreach (GameObject token in tokenmatch)
+            {
+                Destroy(token);
+            }
+        }
+
+        MatchList.Clear();
+    }
+
+    void RefillEmptyCells()
+    {
+        //Bottom up filling
+        for (int i = 7; i < TokenArray.GetLength(0); i--)
+        {
+            for (int j = 7; j < TokenArray.GetLength(1); j--)
+            {
+                //Probability Logic
+                FindFirstObjectByType<RandomTokenGenerator>();
+            }
+        }
+    }
+
+    //Optional
+    bool PossibleMoveChecker()
+    {
+        return false;
     }
 }
