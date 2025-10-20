@@ -5,9 +5,13 @@ using System;
 using System.Collections;
 using UnityEditor.Rendering;
 using static UnityEngine.Rendering.DebugUI.Table;
+using System.Linq;
+using static UnityEngine.Rendering.DebugUI;
 
 public class GridManager : MonoBehaviour
 {
+    public int scene = 1;
+
     public Transform TopLeftPivot;
     public float CellSize = 1f;
 
@@ -23,6 +27,10 @@ public class GridManager : MonoBehaviour
 
     //Array of token prefabs
     public GameObject[] TokenPrefabs;
+
+    int points = 0;
+
+    int points_buffer = 0;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -186,30 +194,35 @@ public class GridManager : MonoBehaviour
 
     public void SwapToken(Vector2Int SelectedCoords, Vector2Int ClosestCoords, bool horiSwap)
     {
-
+        
         //FindFirstObjectByType<InputManager>().SetAnimating(true);
         SwapInArray(SelectedCoords, ClosestCoords);
 
         //Check for valid swap, will return false if not
-        if (CheckMatchesOnBoard())
+        bool match = CheckMatchesOnBoard();
+        
+        if (match)
         {
-            //Do the destory
-            DestroyTokensInList();
-
-            //Refill board
-
-
-            //While loop until no more can be destroyed
-            //while (CheckMatchesOnBoard()){
-            //    
-            //}
+            FindFirstObjectByType<InputManager>().setWorkState(InputManager.GridWorkState.DestroyingMatches);
 
         }
         else
         {
             //Swap them back
             SwapInArray(SelectedCoords, ClosestCoords);
+            FindFirstObjectByType<InputManager>().SetAnimating(false);
         }
+    }
+
+
+    IEnumerator MatchLoop()
+    {
+        yield return new WaitForSeconds(2F);
+        //Do the destory
+        DestroyTokensInList();
+
+        //refill
+        RefillEmptyCells();
     }
 
     void SwapInArray(Vector2Int SelectedCoords, Vector2Int ClosestCoords)
@@ -224,13 +237,9 @@ public class GridManager : MonoBehaviour
         TokenArray[SelectedCoords.y, SelectedCoords.x].transform.position = positionBasedOnPivot(SelectedCoords.y, SelectedCoords.x);
     }
 
-    bool CheckAbilityToMove()
+    public bool CheckMatchesOnBoard()
     {
-        return false;
-    }
-
-    bool CheckMatchesOnBoard()
-    {
+        ClearCheckingArray();
         bool matchfound = false;
         //Column checks
         for (int col = 0; col < TokenArray.GetLength(1); col++)
@@ -248,7 +257,7 @@ public class GridManager : MonoBehaviour
                     {
                         if (TokenArray[row, col].name == TokenArray[i, col].name)
                         {
-                           AddingToMatchList(MatchList.Count - 1, i, col);
+                            AddingToNewMatchList(MatchList.Count - 1, i, col);
                         }
                         else
                         {
@@ -263,6 +272,8 @@ public class GridManager : MonoBehaviour
             }
         }
 
+        ClearCheckingArray();
+
         //Row checks
         for (int row = 0; row < TokenArray.GetLength(0); row++)
         {
@@ -273,17 +284,21 @@ public class GridManager : MonoBehaviour
                     matchfound = true;
 
                     //Adding new matching list
-                    MatchList.Add(new List<GameObject>());
+                    //MatchList.Add(new List<GameObject>());
+
+                    List <GameObject> new_list = new List<GameObject>();
 
                     //Add all three to the match list
                     for (int i = col; i <= 7; i++)
                     {
                         if (TokenArray[row, col].name == TokenArray[row, i].name)
                         {
-                            AddingToMatchList(MatchList.Count - 1, row, i);
+                            new_list.Add(TokenArray[row, i]);
+                            CheckingArray[row, col] = true;
                         }
                         else
                         {
+                            AddToMatchListRow(new_list, row);
                             break;
                         }
                         //
@@ -292,43 +307,177 @@ public class GridManager : MonoBehaviour
                 }
             }
         }
+
         return matchfound;
     }
 
-    void AddingToMatchList(int index, int row, int col)
+    void AddingToNewMatchList(int index, int row, int col)
     {
         MatchList[index].Add(TokenArray[row,col]);
         //Set CheckArray to true so no repeating
         CheckingArray[row, col] = true;
         Debug.Log(row +" "+ col);
     }
-    
-    void DestroyTokensInList()
+
+    //Deciding to add to an existing list or a new list
+    void AddToMatchListRow(List<GameObject> new_list, int row)
+    {
+        for (int i = 0; i < MatchList.Count; i++)
+        {           
+            if (MatchList[i][0].name == new_list[0].name && IntersectionCheck(i, new_list, row))
+            {
+                //Merge them in memory
+                MatchList[i] = MatchList[i].Union(new_list).ToList();
+
+                //end search
+                return;
+            }
+        }
+
+        MatchList.Add(new_list);
+    }
+
+   bool IntersectionCheck(int index, List<GameObject> new_list, int row)
+    {
+        for (int j = 0; j < MatchList[index].Count; j++)
+        {
+            int yInGrid = RowFromWorldPOS(MatchList[index][j].transform.position.y);
+            if (yInGrid == row)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void DestroyTokensInList()
     {
         //Point system here
-        //+i*50 for extra tokens
+        //+50 for extra tokens
         foreach (List<GameObject> tokenmatch in MatchList)
         {
+            //Add point buffer here
             foreach (GameObject token in tokenmatch)
             {
+                int xInGrid = ColFromWorldPOS(token.transform.position.x);
+                int yInGrid = RowFromWorldPOS(token.transform.position.y);
+                TokenArray[yInGrid,xInGrid] =null;
                 Destroy(token);
             }
         }
-
-        MatchList.Clear();
+        MatchList = new List<List<GameObject>>();
     }
 
-    void RefillEmptyCells()
+    public void RefillEmptyCells()
     {
         //Bottom up filling
-        for (int i = 7; i < TokenArray.GetLength(0); i--)
+        for (int i = TokenArray.GetLength(0) - 1; i >= 0; i--)
         {
-            for (int j = 7; j < TokenArray.GetLength(1); j--)
+            for (int j = TokenArray.GetLength(1) - 1; j >= 0; j--)
             {
-                //Probability Logic
-                FindFirstObjectByType<RandomTokenGenerator>();
+                if (TokenArray[i,j]==null)
+                {
+                    //Probability Logic
+                    RandomToken(i, j);
+                }
+                
             }
         }
+    }
+
+    public int RandomToken(int row, int col)
+    {
+        //0 is blue
+        //1 is green
+        //2 is purple
+        //3 is red
+        //4 is yellow
+        if (scene == 1)
+        {
+
+            if (row != 7 && row - 1 >= 0 && TokenArray[row-1,col] == null)
+            {
+                //First token has 40% chance of being the token below it
+                int[] chances = { 15, 15, 15, 15, 15 };
+
+                chances[TokenToTokenIndex(TokenArray[row + 1, col])] = 40;
+                
+                int Prefabindex = RandomTokenPrefabIndex(chances);
+
+                TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
+                Debug.Log(TokenArray[row, col].GetComponent<TokenType>().color + "from column chances");
+                //For every subsequent token will be 60% to the the one underneath
+                for (int i = row - 1; i >= 0 ; i--)
+                {
+                    if (TokenArray[i,col]==null)
+                    {
+                        int[] otherchances = { 10, 10, 10, 10, 10 };
+                        chances[TokenToTokenIndex(TokenArray[i + 1, col])] = 60;
+
+                        Prefabindex = RandomTokenPrefabIndex(chances);
+
+                        TokenArray[i, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(i, col), Quaternion.identity);
+                        Debug.Log(TokenArray[i, col].GetComponent<TokenType>().color + "from column chances");
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                int[] evenchances = { 20, 20, 20, 20, 20 };
+
+                int Prefabindex = RandomTokenPrefabIndex(evenchances);
+
+                TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
+                Debug.Log(TokenArray[row, col].GetComponent<TokenType>().color + "from even chances");
+            }
+
+        }
+        else if (scene == 2)
+        {
+            float[] chances = { 1, 1, 1, 1, 1 };
+        }
+
+        return 0;
+    }
+
+    int RandomTokenPrefabIndex(int[] chances)
+    {
+        int Random_num = UnityEngine.Random.Range(0,100);
+        int sum = 0;
+        Debug.Log("Random number: "+Random_num);
+        for (int i = 0; i < 5; i++)
+        {
+            if (Random_num >= sum && Random_num < sum + chances[i])
+            {
+                return i;
+            }
+            else
+            {
+                sum += chances[i];
+            }
+        }
+        return -1;
+    }
+
+    TokenColor IntToTokenColor(int index)
+    {
+        return TokenPrefabs[index].GetComponent<TokenType>().color;
+    }
+
+    int TokenToTokenIndex(GameObject Token)
+    {
+        for (int i =0; i < TokenPrefabs.Length; i++)
+        {
+            if (Token.GetComponent<TokenType>().color == TokenPrefabs[i].GetComponent<TokenType>().color)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     //Optional

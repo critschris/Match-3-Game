@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEngine.Rendering.DebugUI.Table;
@@ -19,6 +20,10 @@ public class InputManager : MonoBehaviour
     public int ClosestTokenIndex;
 
     bool animating = false;
+
+    GridWorkState gridWorkState = GridWorkState.None;
+
+    public enum GridWorkState {None, CheckingForMatches, DestroyingMatches, RefillingMatches}
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -29,10 +34,64 @@ public class InputManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        
+        if (gridWorkState == GridWorkState.RefillingMatches)
+        {
+            StartCoroutine(RefillTokens());
+            return;
+        }
+        if (gridWorkState == GridWorkState.DestroyingMatches)
+        {
+            StartCoroutine(DestroyTokens());
+            return;
+        }
+        if (gridWorkState == GridWorkState.CheckingForMatches)
+        {
+            StartCoroutine(ChecknewTokens());
+            return;
+        }
         if (!animating)
         {
             MouseChecker();
         }
+        if (gridWorkState == GridWorkState.None)
+        {
+            animating = false;
+        }
+    }
+
+    IEnumerator ChecknewTokens()
+    {
+        yield return new WaitForSeconds(0.5F);
+        bool match = gridman.CheckMatchesOnBoard();
+        if (match)
+        {
+            gridWorkState = GridWorkState.DestroyingMatches;
+        }
+        else
+        {
+            gridWorkState = GridWorkState.None;
+        }
+        
+    }
+
+    IEnumerator RefillTokens()
+    {
+        yield return new WaitForSeconds(0.5F);
+        gridman.RefillEmptyCells();
+        gridWorkState = GridWorkState.CheckingForMatches;
+    }
+
+    IEnumerator DestroyTokens()
+    {
+        yield return new WaitForSeconds(0.5F);
+        gridman.DestroyTokensInList();
+        gridWorkState = GridWorkState.RefillingMatches;
+    }
+
+    public void setWorkState(GridWorkState state)
+    {
+        gridWorkState = state;
     }
 
     void MouseChecker()
@@ -86,10 +145,10 @@ public class InputManager : MonoBehaviour
         }
         if (Input.GetMouseButtonUp(0))
         {
+            animating = true;
+
             //Do the swap (snap into position)
             gridman.SwapToken(SelectedCoords, ClosestCoords, horiSwap);
-
-            //If swap failed, turn off animating after reswap is done
 
             //Reset selected variables
             SelectedToken = null;
