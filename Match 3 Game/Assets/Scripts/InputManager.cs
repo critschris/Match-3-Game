@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEngine.Rendering.DebugUI.Table;
@@ -21,9 +22,15 @@ public class InputManager : MonoBehaviour
 
     bool animating = false;
 
-    GridWorkState gridWorkState = GridWorkState.None;
+    bool checking_lock = false;
 
-    public enum GridWorkState {None, CheckingForMatches, DestroyingMatches, RefillingMatches}
+    public GridWorkState gridWorkState = GridWorkState.None;
+
+    public GameObject NoMoreMovesPanel;
+
+    public int ComboCounter = 0;
+
+    public enum GridWorkState {None, CheckingForMatches, DestroyingMatches, RefillingMatches, MovingAbilityCheck}
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -34,59 +41,111 @@ public class InputManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
-        if (gridWorkState == GridWorkState.RefillingMatches)
+        if (!checking_lock && gridWorkState == GridWorkState.MovingAbilityCheck)
+        {
+            StartCoroutine(AbilityToMoveCheck());
+        }
+        if (!checking_lock && gridWorkState == GridWorkState.CheckingForMatches)
+        {
+            StartCoroutine(ChecknewTokens());
+            return;
+        }
+        if (!checking_lock && gridWorkState == GridWorkState.RefillingMatches)
         {
             StartCoroutine(RefillTokens());
             return;
         }
-        if (gridWorkState == GridWorkState.DestroyingMatches)
+        if (!checking_lock && gridWorkState == GridWorkState.DestroyingMatches)
         {
             StartCoroutine(DestroyTokens());
-            return;
-        }
-        if (gridWorkState == GridWorkState.CheckingForMatches)
-        {
-            StartCoroutine(ChecknewTokens());
             return;
         }
         if (!animating)
         {
             MouseChecker();
         }
-        if (gridWorkState == GridWorkState.None)
+        if (!checking_lock && gridWorkState == GridWorkState.None)
         {
-            animating = false;
+            
         }
+    }
+
+    IEnumerator AbilityToMoveCheck()
+    {
+        checking_lock = true;
+        if (gridman.PossibleMoveChecker())
+        {
+            gridWorkState = GridWorkState.None;
+            animating=false;
+        }
+        else
+        {
+            //Display no more moves screen
+            NoMoreMovesPanel.SetActive(true);
+
+            //Animation
+            NoMoreMovesPanel.GetComponent<Animator>().SetBool("GoAway", false);
+            NoMoreMovesPanel.GetComponent<Animator>().SetBool("TurnBlack", true);
+
+            yield return new WaitForSeconds(0.25F);
+            //Reshuffle board
+            gridman.FillWithTokens();
+
+            gridman.SwapOutMatches();
+
+            yield return new WaitForSeconds(1F);
+            //Turn off no more moves screen
+
+            //Animation
+            NoMoreMovesPanel.GetComponent<Animator>().SetBool("TurnBlack", false);
+            NoMoreMovesPanel.GetComponent<Animator>().SetBool("GoAway", true);
+            yield return new WaitForSeconds(0.25F);
+            NoMoreMovesPanel.SetActive(false);
+
+            gridWorkState = GridWorkState.MovingAbilityCheck;
+        }
+
+        checking_lock = false;
     }
 
     IEnumerator ChecknewTokens()
     {
-        yield return new WaitForSeconds(0.5F);
+        checking_lock = true;
+
         bool match = gridman.CheckMatchesOnBoard();
+        yield return new WaitForSeconds(1F);
         if (match)
         {
             gridWorkState = GridWorkState.DestroyingMatches;
         }
         else
         {
-            gridWorkState = GridWorkState.None;
+            gridWorkState = GridWorkState.MovingAbilityCheck;
         }
-        
+
+        checking_lock = false;
     }
 
     IEnumerator RefillTokens()
     {
-        yield return new WaitForSeconds(0.5F);
+        checking_lock = true;
+
         gridman.RefillEmptyCells();
+        yield return new WaitForSeconds(1F);
         gridWorkState = GridWorkState.CheckingForMatches;
+
+        checking_lock = false;
     }
 
     IEnumerator DestroyTokens()
     {
-        yield return new WaitForSeconds(0.5F);
+        checking_lock = true;
+
         gridman.DestroyTokensInList();
+        yield return new WaitForSeconds(1F);
         gridWorkState = GridWorkState.RefillingMatches;
+
+        checking_lock = false;
     }
 
     public void setWorkState(GridWorkState state)
@@ -102,7 +161,6 @@ public class InputManager : MonoBehaviour
             Vector3 WorldPos = main_camera.ScreenToWorldPoint(ScreenPos);
             int xInGrid = gridman.ColFromWorldPOS(WorldPos.x);
             int yInGrid = gridman.RowFromWorldPOS(WorldPos.y);
-            Debug.Log(xInGrid + "and" + yInGrid);
             if (xInGrid != -1 && yInGrid != -1)
             {
                 SelectedCoords = new Vector2Int(xInGrid, yInGrid);

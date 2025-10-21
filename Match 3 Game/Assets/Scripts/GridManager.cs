@@ -7,6 +7,9 @@ using UnityEditor.Rendering;
 using static UnityEngine.Rendering.DebugUI.Table;
 using System.Linq;
 using static UnityEngine.Rendering.DebugUI;
+using Unity.VisualScripting.Antlr3.Runtime;
+using UnityEngine.UI;
+using TMPro;
 
 public class GridManager : MonoBehaviour
 {
@@ -32,6 +35,8 @@ public class GridManager : MonoBehaviour
 
     int points_buffer = 0;
 
+    public TextMeshProUGUI Points_text;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -54,14 +59,15 @@ public class GridManager : MonoBehaviour
 
     }
 
-    //For testing
-    IEnumerator TestingSwapOut()
+
+
+    public void UpdatePoints()
     {
-        yield return new WaitForSeconds(5F);
-        SwapOutMatches();
+        points += points_buffer;
+        Points_text.text = ""+points;
     }
 
-    void SwapOutMatches()
+    public void SwapOutMatches()
     {
         for (int i = 0; i < TokenArray.GetLength(0); i++)
         {
@@ -144,7 +150,7 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    void FillWithTokens()
+    public void FillWithTokens()
     {
         for (int i = 0; i < TokenArray.GetLength(0); i++)
         {
@@ -198,9 +204,15 @@ public class GridManager : MonoBehaviour
         //FindFirstObjectByType<InputManager>().SetAnimating(true);
         SwapInArray(SelectedCoords, ClosestCoords);
 
+        StartCoroutine(SlowCheckmatch(SelectedCoords, ClosestCoords));
+    }
+
+    IEnumerator SlowCheckmatch(Vector2Int SelectedCoords, Vector2Int ClosestCoords)
+    {
+        yield return new WaitForSeconds(0.5F);
         //Check for valid swap, will return false if not
         bool match = CheckMatchesOnBoard();
-        
+
         if (match)
         {
             FindFirstObjectByType<InputManager>().setWorkState(InputManager.GridWorkState.DestroyingMatches);
@@ -208,21 +220,13 @@ public class GridManager : MonoBehaviour
         }
         else
         {
+            //PLay bad SFX
+            FindFirstObjectByType<AudioManager>().Play("BadMove");
             //Swap them back
             SwapInArray(SelectedCoords, ClosestCoords);
+            yield return new WaitForSeconds(0.5F);
             FindFirstObjectByType<InputManager>().SetAnimating(false);
         }
-    }
-
-
-    IEnumerator MatchLoop()
-    {
-        yield return new WaitForSeconds(2F);
-        //Do the destory
-        DestroyTokensInList();
-
-        //refill
-        RefillEmptyCells();
     }
 
     void SwapInArray(Vector2Int SelectedCoords, Vector2Int ClosestCoords)
@@ -239,14 +243,14 @@ public class GridManager : MonoBehaviour
 
     public bool CheckMatchesOnBoard()
     {
-        ClearCheckingArray();
+        MatchList = new List<List<GameObject>>();
         bool matchfound = false;
         //Column checks
         for (int col = 0; col < TokenArray.GetLength(1); col++)
         {
             for (int row = 0; row < TokenArray.GetLength(0); row++)
             {
-                if (row + 1 <= 6 && row + 2 <= 7 && CheckingArray[row, col]==false && CheckingArray[row + 1, col] == false && CheckingArray[row + 2, col] == false && TokenArray[row, col].name == TokenArray[row + 1, col].name && TokenArray[row + 1, col].name == TokenArray[row + 2, col].name)
+                if (row + 1 <= 6 && row + 2 <= 7 && TokenArray[row, col].name == TokenArray[row + 1, col].name && TokenArray[row + 1, col].name == TokenArray[row + 2, col].name)
                 {
                     matchfound = true;
                     //Adding new matching list
@@ -272,14 +276,12 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        ClearCheckingArray();
-
         //Row checks
         for (int row = 0; row < TokenArray.GetLength(0); row++)
         {
             for (int col = 0; col < TokenArray.GetLength(1); col++)
             {
-                if (col + 1 <= 6 && col + 2 <= 7 && CheckingArray[row, col] == false && CheckingArray[row, col + 1] == false && CheckingArray[row, col + 2] == false && TokenArray[row, col].name == TokenArray[row, col + 1].name && TokenArray[row, col + 1].name == TokenArray[row, col + 2].name)
+                if (col + 1 <= 6 && col + 2 <= 7 && TokenArray[row, col].name == TokenArray[row, col + 1].name && TokenArray[row, col + 1].name == TokenArray[row, col + 2].name)
                 {
                     matchfound = true;
 
@@ -294,7 +296,6 @@ public class GridManager : MonoBehaviour
                         if (TokenArray[row, col].name == TokenArray[row, i].name)
                         {
                             new_list.Add(TokenArray[row, i]);
-                            CheckingArray[row, col] = true;
                         }
                         else
                         {
@@ -307,7 +308,8 @@ public class GridManager : MonoBehaviour
                 }
             }
         }
-
+        Debug.Log("Matchfound is "+matchfound);
+        Debug.Log("MatchList is " + MatchList.Count);
         return matchfound;
     }
 
@@ -316,7 +318,6 @@ public class GridManager : MonoBehaviour
         MatchList[index].Add(TokenArray[row,col]);
         //Set CheckArray to true so no repeating
         CheckingArray[row, col] = true;
-        Debug.Log(row +" "+ col);
     }
 
     //Deciding to add to an existing list or a new list
@@ -341,10 +342,19 @@ public class GridManager : MonoBehaviour
     {
         for (int j = 0; j < MatchList[index].Count; j++)
         {
-            int yInGrid = RowFromWorldPOS(MatchList[index][j].transform.position.y);
+            GameObject chosenOBJ = MatchList[index][j];
+            int yInGrid = RowFromWorldPOS(chosenOBJ.transform.position.y);
             if (yInGrid == row)
             {
-                return true;
+                int xInGridOldList = RowFromWorldPOS(chosenOBJ.transform.position.x);
+                for (int i = 0; i < new_list.Count; i++)
+                {
+                    int xInGridNewList = RowFromWorldPOS(TokenArray[row,i].transform.position.x);
+                    if (xInGridOldList == xInGridNewList)
+                    {
+                        return true;
+                    }
+                }
             }
         }
         return false;
@@ -356,6 +366,8 @@ public class GridManager : MonoBehaviour
         //+50 for extra tokens
         foreach (List<GameObject> tokenmatch in MatchList)
         {
+            points_buffer += 50*tokenmatch.Count;
+            FindFirstObjectByType<AudioManager>().Play("DestroyToken");
             //Add point buffer here
             foreach (GameObject token in tokenmatch)
             {
@@ -365,7 +377,9 @@ public class GridManager : MonoBehaviour
                 Destroy(token);
             }
         }
-        MatchList = new List<List<GameObject>>();
+        UpdatePoints();
+        points_buffer = 0;
+        
     }
 
     public void RefillEmptyCells()
@@ -402,10 +416,9 @@ public class GridManager : MonoBehaviour
 
                 chances[TokenToTokenIndex(TokenArray[row + 1, col])] = 40;
                 
-                int Prefabindex = RandomTokenPrefabIndex(chances);
+                int Prefabindex = RandomTokenPrefabIndexWithProb(chances);
 
                 TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
-                Debug.Log(TokenArray[row, col].GetComponent<TokenType>().color + "from column chances");
                 //For every subsequent token will be 60% to the the one underneath
                 for (int i = row - 1; i >= 0 ; i--)
                 {
@@ -414,10 +427,9 @@ public class GridManager : MonoBehaviour
                         int[] otherchances = { 10, 10, 10, 10, 10 };
                         chances[TokenToTokenIndex(TokenArray[i + 1, col])] = 60;
 
-                        Prefabindex = RandomTokenPrefabIndex(chances);
+                        Prefabindex = RandomTokenPrefabIndexWithProb(chances);
 
                         TokenArray[i, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(i, col), Quaternion.identity);
-                        Debug.Log(TokenArray[i, col].GetComponent<TokenType>().color + "from column chances");
                     }
                     else
                     {
@@ -429,26 +441,61 @@ public class GridManager : MonoBehaviour
             {
                 int[] evenchances = { 20, 20, 20, 20, 20 };
 
-                int Prefabindex = RandomTokenPrefabIndex(evenchances);
+                int Prefabindex = RandomTokenPrefabIndexWithProb(evenchances);
 
                 TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
-                Debug.Log(TokenArray[row, col].GetComponent<TokenType>().color + "from even chances");
             }
 
         }
         else if (scene == 2)
         {
-            float[] chances = { 1, 1, 1, 1, 1 };
+            int[] chances = { 1, 1, 1, 1, 1};
+
+            if (row + 1 <= 7 && TokenArray[row + 1, col] != null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row + 1, col])] += 1;
+            }
+            if (row + 1 <= 7 && col + 1 <= 7 && TokenArray[row + 1, col + 1]!= null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row + 1, col + 1])] += 1;
+            }
+            if (col + 1 <= 7 && TokenArray[row, col + 1]!=null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row, col + 1])] += 1;
+            }
+            if (row - 1 >= 0 && col + 1 <= 7 && TokenArray[row - 1, col + 1]!=null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row - 1, col + 1])] += 1;
+            }
+            if (row - 1 >= 0 && TokenArray[row - 1, col]!=null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row - 1, col])] += 1;
+            }
+            if (row - 1 >= 0 && col - 1 >= 0 && TokenArray[row - 1, col - 1]!=null)
+            {
+                chances[TokenToTokenIndex(TokenArray[row - 1, col - 1])] += 1;
+            }
+            if (col - 1 >= 0 && TokenArray[row, col - 1])
+            {
+                chances[TokenToTokenIndex(TokenArray[row, col - 1])] += 1;
+            }
+            if (col - 1 >= 0 && row + 1 <= 7 && TokenArray[row + 1, col - 1])
+            {
+                chances[TokenToTokenIndex(TokenArray[row + 1, col - 1])] += 1;
+            }
+
+            int Prefabindex = RandomTokenPrefabIndex(chances);
+
+            TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
         }
 
         return 0;
     }
 
-    int RandomTokenPrefabIndex(int[] chances)
+    int RandomTokenPrefabIndexWithProb(int[] chances)
     {
         int Random_num = UnityEngine.Random.Range(0,100);
         int sum = 0;
-        Debug.Log("Random number: "+Random_num);
         for (int i = 0; i < 5; i++)
         {
             if (Random_num >= sum && Random_num < sum + chances[i])
@@ -463,9 +510,27 @@ public class GridManager : MonoBehaviour
         return -1;
     }
 
-    TokenColor IntToTokenColor(int index)
+    int RandomTokenPrefabIndex(int[] chances)
     {
-        return TokenPrefabs[index].GetComponent<TokenType>().color;
+        int total = 0;
+        for (int i = 0;i < chances.Length; i++)
+        {
+            total += chances[i];
+        }
+        int Random_num = UnityEngine.Random.Range(0, total);
+        int sum = 0;
+        for (int i = 0; i < 5; i++)
+        {
+            if (Random_num >= sum && Random_num < sum + chances[i])
+            {
+                return i;
+            }
+            else
+            {
+                sum += chances[i];
+            }
+        }
+        return -1;
     }
 
     int TokenToTokenIndex(GameObject Token)
@@ -480,9 +545,71 @@ public class GridManager : MonoBehaviour
         return -1;
     }
 
-    //Optional
-    bool PossibleMoveChecker()
+    public bool PossibleMoveChecker()
     {
+        for (int i = 0; i < TokenArray.GetLength(0); i++)
+        {
+            for (int j = 0; j < TokenArray.GetLength(1); j++)
+            {
+                //Column checks
+                if (i + 1 < 8 && TokenArray[i,j].name == TokenArray[i+1,j].name)
+                {
+                    if (i + 3 < 8 && TokenArray[i,j].name == TokenArray[i+3,j].name)
+                    {
+                        return true;
+                    }
+                    else if (i + 2 < 8 && j + 1 < 8 && TokenArray[i, j].name == TokenArray[i + 2, j + 1].name)
+                    {
+                        return true;
+                    }
+                    else if (i + 2 < 8 && j - 1 >= 0 && TokenArray[i, j].name == TokenArray[i + 2, j - 1].name)
+                    {
+                        return true;
+                    }
+                    else if (i - 2 >= 0 && TokenArray[i, j].name == TokenArray[i - 2, j].name)
+                    {
+                        return true;
+                    }
+                    else if (i - 1 >= 0 && j - 1 >= 0 && TokenArray[i, j].name == TokenArray[i - 1, j - 1].name)
+                    {
+                        return true;
+                    }
+                    else if (i - 1 >= 0 && j + 1 < 8 && TokenArray[i, j].name == TokenArray[i - 1, j + 1].name)
+                    {
+                        return true;
+                    }
+                }
+
+                //Row Checks
+                if (j + 1 < 8 && TokenArray[i, j].name == TokenArray[i, j + 1].name)
+                {
+                    if (j + 3 < 8 && TokenArray[i, j].name == TokenArray[i, j + 3].name)
+                    {
+                        return true;
+                    }
+                    else if (j + 2 < 8 && i - 1 >= 0 && TokenArray[i, j].name == TokenArray[i - 1, j + 2].name)
+                    {
+                        return true;
+                    }
+                    else if (j + 2 < 8 && i + 1 < 8 && TokenArray[i, j].name == TokenArray[i + 1, j + 2].name)
+                    {
+                        return true;
+                    }
+                    else if (j - 2 >= 0 && TokenArray[i, j].name == TokenArray[i, j - 2].name)
+                    {
+                        return true;
+                    }
+                    else if (j - 1 >= 0 && i - 1 >= 0 && TokenArray[i, j].name == TokenArray[i - 1, j - 1].name)
+                    {
+                        return true;
+                    }
+                    else if (j - 1 >= 0 && i + 1 < 8 && TokenArray[i, j].name == TokenArray[i + 1, j - 1].name)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
         return false;
     }
 }
