@@ -57,3 +57,9 @@ MonoBehaviour:
     volume: 0.5
     pitch: 0.5
     source: {fileID: 0}
+  - name: BGM
+    clip: {fileID: 8300000, guid: 5ef303844f1304c419bb18b1acda7526, type: 3}
+    loop: 0
+    volume: 0.5
+    pitch: 0.5
+    source: {fileID: 0}

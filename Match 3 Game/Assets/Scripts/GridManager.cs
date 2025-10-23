@@ -31,15 +31,22 @@ public class GridManager : MonoBehaviour
     //Array of token prefabs
     public GameObject[] TokenPrefabs;
 
-    int points = 0;
+    public int ComboCounter = 1;
 
-    int points_buffer = 0;
+    public int points = 0;
 
-    public TextMeshProUGUI Points_text;
+    public int points_buffer = 0;
+
+    TextMeshProUGUI[] token_point_text;
+
+    UIManager uIManager;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+
+        uIManager = FindFirstObjectByType<UIManager>();
+
         CheckingArray = new bool[8,8];
 
         TokenArray = new GameObject[8, 8];
@@ -59,12 +66,26 @@ public class GridManager : MonoBehaviour
 
     }
 
-
+    public void UpdateTokenPoint(int index)
+    {
+        token_point_text = uIManager.Token_point_text;
+        int amount = Int32.Parse(token_point_text[index].text);
+        if (amount<=1)
+        {
+            token_point_text[index].text = "0";
+        }
+        else
+        {
+            token_point_text[index].text = ""+(amount-1);
+        }
+        
+    }
 
     public void UpdatePoints()
     {
         points += points_buffer;
-        Points_text.text = ""+points;
+        uIManager.Points_text.text = ""+points;
+        points_buffer = 0;
     }
 
     public void SwapOutMatches()
@@ -216,6 +237,7 @@ public class GridManager : MonoBehaviour
         if (match)
         {
             FindFirstObjectByType<InputManager>().setWorkState(InputManager.GridWorkState.DestroyingMatches);
+            FindFirstObjectByType<InputManager>().ReduceMoves();
 
         }
         else
@@ -224,6 +246,7 @@ public class GridManager : MonoBehaviour
             FindFirstObjectByType<AudioManager>().Play("BadMove");
             //Swap them back
             SwapInArray(SelectedCoords, ClosestCoords);
+            FindFirstObjectByType<InputManager>().ReduceMoves();
             yield return new WaitForSeconds(0.5F);
             FindFirstObjectByType<InputManager>().SetAnimating(false);
         }
@@ -296,6 +319,7 @@ public class GridManager : MonoBehaviour
                         if (TokenArray[row, col].name == TokenArray[row, i].name)
                         {
                             new_list.Add(TokenArray[row, i]);
+                            
                         }
                         else
                         {
@@ -304,12 +328,14 @@ public class GridManager : MonoBehaviour
                         }
                         //
                         col = i;
+                        if (i == 7)
+                        {
+                            AddToMatchListRow(new_list, row);
+                        }
                     }
                 }
             }
         }
-        Debug.Log("Matchfound is "+matchfound);
-        Debug.Log("MatchList is " + MatchList.Count);
         return matchfound;
     }
 
@@ -336,6 +362,7 @@ public class GridManager : MonoBehaviour
         }
 
         MatchList.Add(new_list);
+
     }
 
    bool IntersectionCheck(int index, List<GameObject> new_list, int row)
@@ -363,22 +390,33 @@ public class GridManager : MonoBehaviour
     public void DestroyTokensInList()
     {
         //Point system here
-        //+50 for extra tokens
+        
+        FindFirstObjectByType<AudioManager>().Play("DestroyToken");
+        
         foreach (List<GameObject> tokenmatch in MatchList)
         {
-            points_buffer += 50*tokenmatch.Count;
-            FindFirstObjectByType<AudioManager>().Play("DestroyToken");
+            
+            //+50 for extra tokens
+            points_buffer += ComboCounter*50*tokenmatch.Count;
+
+            //counting colors
+            UpdateTokenPoint(TokenToTokenIndex(tokenmatch[0]));
+
             //Add point buffer here
             foreach (GameObject token in tokenmatch)
             {
-                int xInGrid = ColFromWorldPOS(token.transform.position.x);
-                int yInGrid = RowFromWorldPOS(token.transform.position.y);
-                TokenArray[yInGrid,xInGrid] =null;
-                Destroy(token);
+                if (token!= null)
+                {
+                    int xInGrid = ColFromWorldPOS(token.transform.position.x);
+                    int yInGrid = RowFromWorldPOS(token.transform.position.y);
+                    TokenArray[yInGrid, xInGrid] = null;
+                    Destroy(token);
+                }
+                
             }
         }
         UpdatePoints();
-        points_buffer = 0;
+        
         
     }
 
@@ -408,8 +446,8 @@ public class GridManager : MonoBehaviour
         //4 is yellow
         if (scene == 1)
         {
-
-            if (row != 7 && row - 1 >= 0 && TokenArray[row-1,col] == null)
+            //If it is a column match (ie. there is three in a column)
+            if (row != 7 && row - 1 >= 0 && row - 2 >= 0 && TokenArray[row-1,col] == null && TokenArray[row - 2, col] == null)
             {
                 //First token has 40% chance of being the token below it
                 int[] chances = { 15, 15, 15, 15, 15 };
@@ -439,11 +477,27 @@ public class GridManager : MonoBehaviour
             }
             else
             {
-                int[] evenchances = { 20, 20, 20, 20, 20 };
+                if (row != 7)
+                {
+                    //Has 60% chance of being the token below it
+                    int[] chances = { 10, 10, 10, 10, 10 };
 
-                int Prefabindex = RandomTokenPrefabIndexWithProb(evenchances);
+                    chances[TokenToTokenIndex(TokenArray[row + 1, col])] = 60;
 
-                TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
+                    int Prefabindex = RandomTokenPrefabIndexWithProb(chances);
+
+                    TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
+                }
+                else
+                {
+                    //if it is on the bottom, even chances
+                    int[] evenchances = { 20, 20, 20, 20, 20 };
+
+                    int Prefabindex = RandomTokenPrefabIndexWithProb(evenchances);
+
+                    TokenArray[row, col] = Instantiate(TokenPrefabs[Prefabindex], positionBasedOnPivot(row, col), Quaternion.identity);
+                }
+                
             }
 
         }

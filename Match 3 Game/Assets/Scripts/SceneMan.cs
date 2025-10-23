@@ -22,4 +22,22 @@ public class SceneMan : MonoBehaviour
     {
         SceneManager.LoadScene(sceneBuildIndex: 1);
     }
+
+    public void GoToLevel2()
+    {
+        SceneManager.LoadScene(sceneBuildIndex: 1);
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
+    }
+
+    public void Restart()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+    
+    
 }
