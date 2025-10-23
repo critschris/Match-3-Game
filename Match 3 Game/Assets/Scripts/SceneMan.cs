@@ -4,11 +4,13 @@ public class SceneMan : MonoBehaviour
 {
     public void PauseGame()
     {
+        FindFirstObjectByType<InputManager>().paused_game = true;
         Time.timeScale = 0;
     }
 
     public void ContinueGame()
     {
+        FindFirstObjectByType<InputManager>().paused_game = false;
         Time.timeScale = 1f;
     }
 

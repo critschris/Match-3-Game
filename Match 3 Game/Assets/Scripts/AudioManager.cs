@@ -38,7 +38,12 @@ public class AudioManager : MonoBehaviour
             Debug.Log("Not Found");
             return;
         }
-        s.source.Play();
+        if (!s.source.isPlaying && s.name=="BGM")
+        {
+            s.source.Play();
+        }
+        
+        
     }
 
 }

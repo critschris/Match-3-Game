@@ -1,10 +1,6 @@
 using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
-using static UnityEngine.Rendering.DebugUI.Table;
 using System;
 
 public class InputManager : MonoBehaviour
@@ -32,7 +28,7 @@ public class InputManager : MonoBehaviour
     public GridWorkState gridWorkState = GridWorkState.None;
 
 
-    
+    public bool paused_game;
 
     public float Moves_Count = 15;
 
@@ -50,6 +46,7 @@ public class InputManager : MonoBehaviour
         TimeCounter = TimeLimit;
         TimeCheckpoint = Mathf.FloorToInt(TimeLimit - 1);
         FindFirstObjectByType<UIManager>().Timer.text = ""+Mathf.FloorToInt(TimeLimit);
+        paused_game = false;
     }
 
     // Update is called once per frame
@@ -75,7 +72,7 @@ public class InputManager : MonoBehaviour
             StartCoroutine(DestroyTokens());
             return;
         }
-        if (!animating)
+        if (!animating&&!paused_game)
         {
             MouseChecker();
         }

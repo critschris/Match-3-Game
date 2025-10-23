@@ -1,14 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using System;
 using System.Collections;
-using UnityEditor.Rendering;
-using static UnityEngine.Rendering.DebugUI.Table;
 using System.Linq;
-using static UnityEngine.Rendering.DebugUI;
-using Unity.VisualScripting.Antlr3.Runtime;
-using UnityEngine.UI;
 using TMPro;
 
 public class GridManager : MonoBehaviour
